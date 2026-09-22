@@ -8,20 +8,20 @@
 module "dc01" {
   source = "./modules/windows_vm"
 
-  vm_name               = "dc01"
-  datacenter_name       = var.datacenter_name
-  compute_cluster_name  = var.compute_cluster_name
-  datastore_name        = var.datastore_name
-  network_name          = var.network_name
-  template_name         = var.windows_template_name
-  local_admin_password  = var.local_admin_password
+  vm_name              = "dc01"
+  datacenter_name      = var.datacenter_name
+  compute_cluster_name = var.compute_cluster_name
+  datastore_name       = var.datastore_name
+  network_name         = var.network_name
+  template_name        = var.windows_template_name
+  local_admin_password = var.local_admin_password
 
   num_cpus  = 2
   memory_mb = 4096
 
-  ip_address           = var.vm_ips.dc01
-  gateway_ip           = var.gateway_ip
-  netmask_cidr_prefix  = var.netmask_cidr_prefix
+  ip_address          = var.vm_ips.dc01
+  gateway_ip          = var.gateway_ip
+  netmask_cidr_prefix = var.netmask_cidr_prefix
   # dc01 IS the DNS server once ansible/ad_domain_controller runs — until
   # then it (and everyone else) points at a placeholder/upstream resolver.
   # Set var.dns_server_ip to dc01's own IP once the forest exists, and
@@ -110,7 +110,7 @@ module "wsus01" {
 
   # WSUS content store needs real room — patch content adds up fast across
   # even a modest set of products/classifications.
-  os_disk_size_gb     = 150
+  os_disk_size_gb = 150
 
   ip_address          = var.vm_ips.wsus01
   gateway_ip          = var.gateway_ip

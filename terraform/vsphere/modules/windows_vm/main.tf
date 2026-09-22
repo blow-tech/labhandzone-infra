@@ -79,7 +79,7 @@ resource "vsphere_virtual_machine" "this" {
         workgroup      = "WORKGROUP"
         admin_password = var.local_admin_password
         # Domain join deliberately NOT set here — see the file header note.
-        time_zone      = var.time_zone_id
+        time_zone = var.time_zone_id
       }
 
       network_interface {
