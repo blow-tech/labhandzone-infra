@@ -1,0 +1,36 @@
+; Managed by Ansible role sql_server_fci — templates/ConfigurationFile-InstallFailoverCluster.ini.j2
+; Run on the FIRST node only (sql01) — creates the SQL Server FCI cluster
+; resource. Parameter set current as of SQL Server 2019/2022; cross-check
+; against Microsoft's ConfigurationFile.ini reference for your exact
+; version before a real run — this has not been executed against real
+; SQL Server setup media (see the root README's Known limitations).
+
+[OPTIONS]
+ACTION="InstallFailoverCluster"
+ENU="True"
+QUIET="True"
+IACCEPTSQLSERVERLICENSETERMS="True"
+FEATURES=SQLENGINE
+INSTANCENAME="{{ sql_server_instance_name }}"
+INSTANCEID="{{ sql_server_instance_name }}"
+
+FAILOVERCLUSTERGROUP="SQL Server ({{ sql_server_instance_name }})"
+FAILOVERCLUSTERDISKS="SQLData"
+FAILOVERCLUSTERNETWORKNAME="{{ sql_server_fci_network_name }}"
+FAILOVERCLUSTERIPADDRESSES="IPv4;{{ sql_server_fci_ip }};Cluster Network 1;{{ sql_server_fci_ip_subnet_mask }}"
+
+SQLSVCACCOUNT="{{ sql_service_account }}"
+SQLSVCPASSWORD="{{ sql_service_account_password }}"
+AGTSVCACCOUNT="{{ sql_agent_service_account }}"
+AGTSVCPASSWORD="{{ sql_agent_service_account_password }}"
+
+; Windows-only authentication (no SECURITYMODE line) — matches the
+; AD-integrated posture the rest of this lab assumes. Add
+; SECURITYMODE="SQL" and SAPWD if mixed-mode auth is genuinely needed.
+SQLSYSADMINACCOUNTS="{{ sql_sysadmin_accounts }}"
+
+INSTALLSQLDATADIR="{{ sql_server_data_drive }}:\MSSQL\Data"
+SQLUSERDBDIR="{{ sql_server_data_drive }}:\MSSQL\Data"
+SQLUSERDBLOGDIR="{{ sql_server_data_drive }}:\MSSQL\Log"
+SQLTEMPDBDIR="{{ sql_server_data_drive }}:\MSSQL\TempDB"
+SQLBACKUPDIR="{{ sql_server_data_drive }}:\MSSQL\Backup"

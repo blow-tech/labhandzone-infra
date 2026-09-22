@@ -1,0 +1,26 @@
+---
+# tasks/main.yml — role: domain_join
+# Runs on sql01, sql02, fs01, wsus01. Joins the host to labhandzone.local
+# into the OU appropriate for its role (set via domain_join_ou_path in
+# each host's group_vars). Requires dc01's ad_domain_controller role to
+# have already run — the domain has to exist before anything can join it.
+
+- name: Join the domain
+  microsoft.ad.membership:
+    dns_domain_name: "{{ domain_join_domain_name }}"
+    domain_admin_user: "{{ domain_join_admin_user }}"
+    domain_admin_password: "{{ domain_join_admin_password }}"
+    domain_ou_path: "{{ domain_join_ou_path }}"
+    state: domain
+    reboot: true
+  register: join_result
+
+- name: Wait for the host to come back after the domain-join reboot
+  ansible.builtin.wait_for_connection:
+    delay: 30
+    timeout: 600
+  when: join_result.reboot_required | default(false)
+
+- name: Re-gather facts after the reboot
+  ansible.builtin.setup:
+  when: join_result.reboot_required | default(false)

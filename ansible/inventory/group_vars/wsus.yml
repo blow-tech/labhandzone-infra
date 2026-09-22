@@ -1,0 +1,3 @@
+---
+# ansible/inventory/group_vars/wsus.yml
+domain_join_ou_path: "OU=WSUSServers,OU=Servers,DC=labhandzone,DC=local"

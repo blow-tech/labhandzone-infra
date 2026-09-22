@@ -1,0 +1,112 @@
+---
+# tasks/main.yml — role: iscsi_target
+# Runs on fs01. Turns two raw data disks (provisioned by Terraform — see
+# terraform/vsphere/main.tf's fs01 module block, extra_disk_sizes_gb =
+# [5, 100]) into iSCSI-served LUNs for the WSFC quorum and SQL FCI shared
+# data, exposed only to the SQL cluster nodes' IPs.
+#
+# ASSUMPTION: this lab always attaches exactly 2 extra disks to fs01 in a
+# fixed order, so "disk 1" (after the OS's disk 0) is the 5GB quorum disk
+# and "disk 2" is the 100GB data disk. Verify with `Get-Disk` on a real
+# host before trusting disk_number blindly in a different environment.
+
+- name: Install iSCSI Target Server role
+  ansible.windows.win_feature:
+    name: FS-iSCSITarget-Server
+    include_management_tools: true
+    state: present
+  register: iscsi_target_feature
+
+- name: Reboot if the feature install requires it
+  ansible.windows.win_reboot:
+  when: iscsi_target_feature.reboot_required
+
+- name: Bring any raw/uninitialized disks online and initialize as GPT
+  ansible.windows.win_shell: |
+    Get-Disk | Where-Object { $_.PartitionStyle -eq 'RAW' } | ForEach-Object {
+      Set-Disk -Number $_.Number -IsOffline $false
+      Initialize-Disk -Number $_.Number -PartitionStyle GPT
+    }
+  register: disk_init_result
+  changed_when: "'Initialize-Disk' in disk_init_result.stdout or disk_init_result.stdout != ''"
+
+- name: Create partition for the quorum disk (disk 1)
+  community.windows.win_partition:
+    disk_number: 1
+    partition_size: "{{ iscsi_quorum_disk_size_gb }} GiB"
+    drive_letter: "{{ iscsi_quorum_drive_letter }}"
+
+- name: Create partition for the data disk (disk 2)
+  community.windows.win_partition:
+    disk_number: 2
+    partition_size: "{{ iscsi_data_disk_size_gb }} GiB"
+    drive_letter: "{{ iscsi_data_drive_letter }}"
+
+- name: Format the quorum partition NTFS
+  community.windows.win_format:
+    drive_letter: "{{ iscsi_quorum_drive_letter }}"
+    file_system: NTFS
+    new_label: "Quorum"
+
+- name: Format the data partition NTFS
+  community.windows.win_format:
+    drive_letter: "{{ iscsi_data_drive_letter }}"
+    file_system: NTFS
+    new_label: "SQLData"
+
+- name: Create iSCSI virtual disk directories
+  ansible.windows.win_file:
+    path: "{{ item }}:\\iSCSIVirtualDisks"
+    state: directory
+  loop:
+    - "{{ iscsi_quorum_drive_letter }}"
+    - "{{ iscsi_data_drive_letter }}"
+
+- name: Create iSCSI virtual disk (quorum)
+  ansible.windows.win_shell: |
+    if (-not (Get-IscsiVirtualDisk -Path '{{ iscsi_quorum_drive_letter }}:\iSCSIVirtualDisks\quorum.vhdx' -ErrorAction SilentlyContinue)) {
+      New-IscsiVirtualDisk -Path '{{ iscsi_quorum_drive_letter }}:\iSCSIVirtualDisks\quorum.vhdx' -Size {{ (iscsi_quorum_disk_size_gb | int - 1) }}GB
+      Write-Output "created"
+    } else {
+      Write-Output "already exists"
+    }
+  register: quorum_vdisk_result
+  changed_when: "'created' in quorum_vdisk_result.stdout"
+
+- name: Create iSCSI virtual disk (SQL data)
+  ansible.windows.win_shell: |
+    if (-not (Get-IscsiVirtualDisk -Path '{{ iscsi_data_drive_letter }}:\iSCSIVirtualDisks\sqldata.vhdx' -ErrorAction SilentlyContinue)) {
+      New-IscsiVirtualDisk -Path '{{ iscsi_data_drive_letter }}:\iSCSIVirtualDisks\sqldata.vhdx' -Size {{ (iscsi_data_disk_size_gb | int - 1) }}GB
+      Write-Output "created"
+    } else {
+      Write-Output "already exists"
+    }
+  register: data_vdisk_result
+  changed_when: "'created' in data_vdisk_result.stdout"
+
+- name: Create iSCSI server target, scoped to the SQL cluster nodes only
+  ansible.windows.win_shell: |
+    if (-not (Get-IscsiServerTarget -TargetName '{{ iscsi_target_name }}' -ErrorAction SilentlyContinue)) {
+      New-IscsiServerTarget -TargetName '{{ iscsi_target_name }}' `
+        -InitiatorIds {{ iscsi_allowed_initiator_ips | map('regex_replace', '^(.*)$', "'IPAddress:\1'") | join(',') }}
+      Write-Output "created"
+    } else {
+      Write-Output "already exists"
+    }
+  register: iscsi_target_result
+  changed_when: "'created' in iscsi_target_result.stdout"
+
+- name: Map virtual disks to the iSCSI target
+  ansible.windows.win_shell: |
+    $mapped = Get-IscsiVirtualDiskTargetMapping -TargetName '{{ iscsi_target_name }}' -ErrorAction SilentlyContinue
+    if (-not ($mapped | Where-Object { $_.Path -eq '{{ item }}' })) {
+      Add-IscsiVirtualDiskTargetMapping -TargetName '{{ iscsi_target_name }}' -Path '{{ item }}'
+      Write-Output "mapped"
+    } else {
+      Write-Output "already mapped"
+    }
+  loop:
+    - "{{ iscsi_quorum_drive_letter }}:\\iSCSIVirtualDisks\\quorum.vhdx"
+    - "{{ iscsi_data_drive_letter }}:\\iSCSIVirtualDisks\\sqldata.vhdx"
+  register: mapping_result
+  changed_when: "'mapped' in mapping_result.stdout"

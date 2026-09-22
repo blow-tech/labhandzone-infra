@@ -1,0 +1,17 @@
+# Terraform
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/terraform.tfvars
+terraform/**/*.tfplan
+terraform/**/crash.log
+
+# Ansible secrets
+ansible/inventory/hosts.ini.local
+ansible/inventory/host_vars/
+ansible/*.retry
+.vault_pass
+
+# OS/editor cruft
+.DS_Store
+*.swp

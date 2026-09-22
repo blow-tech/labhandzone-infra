@@ -1,0 +1,20 @@
+---
+ad_domain_name: "labhandzone.local"
+ad_domain_netbios_name: "LABHANDZONE"
+ad_safe_mode_password: "CHANGE_ME_VIA_ANSIBLE_VAULT"
+
+# Base OU structure created right after forest promotion — sql/file/wsus
+# server computer objects get moved into these by the domain_join role.
+# Order matters: parents must be created before children reference them.
+ad_base_ous:
+  - name: "Servers"
+    parent_dn: "{{ ad_domain_dn }}"
+  - name: "SQLServers"
+    parent_dn: "OU=Servers,{{ ad_domain_dn }}"
+  - name: "FileServers"
+    parent_dn: "OU=Servers,{{ ad_domain_dn }}"
+  - name: "WSUSServers"
+    parent_dn: "OU=Servers,{{ ad_domain_dn }}"
+
+# Derived from ad_domain_name (e.g. "labhandzone.local" -> "DC=labhandzone,DC=local")
+ad_domain_dn: "{{ 'DC=' + ad_domain_name.split('.') | join(',DC=') }}"

@@ -1,0 +1,7 @@
+---
+domain_join_domain_name: "labhandzone.local"
+domain_join_admin_user: "labhandzone\\Administrator"
+domain_join_admin_password: "CHANGE_ME_VIA_ANSIBLE_VAULT"
+# Set per-host-group in group_vars — where this host's computer object
+# should live, e.g. "OU=SQLServers,OU=Servers,DC=labhandzone,DC=local"
+domain_join_ou_path: ""

@@ -1,0 +1,7 @@
+---
+iscsi_target_portal_ip: ""   # set to fs01's IP in group_vars/sql_nodes.yml
+iscsi_target_name: "labhandzone-cluster"
+# Only sql01 initializes the disks after first connect — sql02 just needs
+# to see them; WSFC takes ownership once the cluster forms. Set per-host
+# in inventory (sql01: true, sql02: false).
+iscsi_initialize_disks: false

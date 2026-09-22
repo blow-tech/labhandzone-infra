@@ -1,0 +1,16 @@
+; Managed by Ansible role sql_server_fci — templates/ConfigurationFile-AddNode.ini.j2
+; Run on the SECOND node (sql02) — joins the existing SQL Server FCI
+; created by sql01. Same version caveat as the InstallFailoverCluster
+; template — not executed against real media.
+
+[OPTIONS]
+ACTION="AddNode"
+ENU="True"
+QUIET="True"
+IACCEPTSQLSERVERLICENSETERMS="True"
+INSTANCENAME="{{ sql_server_instance_name }}"
+
+SQLSVCACCOUNT="{{ sql_service_account }}"
+SQLSVCPASSWORD="{{ sql_service_account_password }}"
+AGTSVCACCOUNT="{{ sql_agent_service_account }}"
+AGTSVCPASSWORD="{{ sql_agent_service_account_password }}"

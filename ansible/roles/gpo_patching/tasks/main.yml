@@ -1,0 +1,44 @@
+---
+# tasks/main.yml — role: gpo_patching
+# Runs on dc01. Creates the patch-ring OU structure, creates the GPOs with
+# WSUS client-targeting registry settings (via the templated PowerShell
+# script — see its header comment for why that's scripted rather than a
+# dedicated module), then links each GPO to its OU using the real
+# microsoft.ad.gpo module.
+
+- name: Create top-level PatchRings OU
+  microsoft.ad.ou:
+    name: PatchRings
+    path: "{{ gpo_patching_domain_dn }}"
+    state: present
+
+- name: Create per-ring OUs under PatchRings
+  microsoft.ad.ou:
+    name: "{{ item.ou_name }}"
+    path: "OU=PatchRings,{{ gpo_patching_domain_dn }}"
+    state: present
+  loop: "{{ gpo_patching_rings }}"
+
+- name: Template the GPO creation/configuration script
+  ansible.windows.win_template:
+    src: New-PatchingGPOs.ps1.j2
+    dest: 'C:\Windows\Temp\New-PatchingGPOs.ps1'
+
+- name: Run the GPO creation/configuration script
+  ansible.windows.win_shell: 'C:\Windows\Temp\New-PatchingGPOs.ps1'
+  register: gpo_script_result
+  changed_when: true
+
+- name: Clean up the script
+  ansible.windows.win_file:
+    path: 'C:\Windows\Temp\New-PatchingGPOs.ps1'
+    state: absent
+
+- name: Link each ring's GPO to its OU
+  microsoft.ad.gpo:
+    name: "{{ item.gpo_name }}"
+    target: "OU={{ item.ou_name }},OU=PatchRings,{{ gpo_patching_domain_dn }}"
+    state: present
+    enabled: true
+    enforced: false
+  loop: "{{ gpo_patching_rings }}"

@@ -1,0 +1,28 @@
+# Copy to terraform.tfvars and fill in real values. terraform.tfvars is
+# gitignored — never commit it with real credentials/IPs.
+
+vsphere_user                 = "administrator@vsphere.local"
+vsphere_password             = "CHANGE_ME"
+vsphere_server                = "vcenter.labhandzone.local"
+vsphere_allow_unverified_ssl = true
+
+datacenter_name       = "Lab-Datacenter"
+compute_cluster_name  = "Lab-Cluster"
+datastore_name        = "datastore1"
+network_name           = "VM Network"
+windows_template_name = "win2022-template"
+
+domain_name    = "labhandzone.local"
+dns_server_ip  = "10.10.10.10"    # set to dc01's IP below; re-apply after the forest exists
+gateway_ip     = "10.10.10.1"
+netmask_cidr_prefix = 24
+
+local_admin_password = "CHANGE_ME_TOO"
+
+vm_ips = {
+  dc01   = "10.10.10.10"
+  sql01  = "10.10.10.21"
+  sql02  = "10.10.10.22"
+  fs01   = "10.10.10.30"
+  wsus01 = "10.10.10.40"
+}

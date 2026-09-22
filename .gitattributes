@@ -1,0 +1,6 @@
+*.yml   linguist-language=YAML
+*.yaml  linguist-language=YAML
+*.j2    linguist-language=Jinja
+*.ini   linguist-language=INI
+*.ps1   linguist-language=PowerShell
+*.tf    linguist-language=HCL

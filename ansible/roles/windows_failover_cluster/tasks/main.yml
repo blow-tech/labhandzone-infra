@@ -1,0 +1,56 @@
+---
+# tasks/main.yml — role: windows_failover_cluster
+# Runs on both sql01 and sql02. Installs the Failover-Clustering feature on
+# both nodes; cluster creation, disk import, and quorum configuration only
+# run from the node flagged wsfc_is_cluster_creation_node: true (sql01, by
+# convention in this project — see group_vars/sql_nodes.yml).
+
+- name: Install Failover Clustering feature
+  ansible.windows.win_feature:
+    name: Failover-Clustering
+    include_management_tools: true
+    state: present
+  register: wsfc_feature
+
+- name: Reboot if the feature install requires it
+  ansible.windows.win_reboot:
+  when: wsfc_feature.reboot_required
+
+# --- Everything below only runs from the designated creation node ---
+
+- name: Check whether the cluster already exists
+  ansible.windows.win_shell: |
+    if (Get-Cluster -Name '{{ wsfc_cluster_name }}' -ErrorAction SilentlyContinue) {
+      Write-Output "exists"
+    } else {
+      Write-Output "absent"
+    }
+  register: cluster_check
+  changed_when: false
+  when: wsfc_is_cluster_creation_node | bool
+
+- name: Create the Windows Failover Cluster (no storage yet — added next)
+  ansible.windows.win_shell: >
+    New-Cluster -Name '{{ wsfc_cluster_name }}' -Node {{ wsfc_nodes | join(',') }}
+    -StaticAddress {{ wsfc_cluster_ip }} -NoStorage
+  when:
+    - wsfc_is_cluster_creation_node | bool
+    - cluster_check.stdout | trim == "absent"
+
+- name: Add available iSCSI disks (quorum + data) to the cluster
+  ansible.windows.win_shell: |
+    Get-ClusterAvailableDisk | Add-ClusterDisk
+  register: add_disk_result
+  changed_when: "add_disk_result.stdout != ''"
+  when: wsfc_is_cluster_creation_node | bool
+
+- name: Configure quorum with a file share witness on fs01
+  # Requires the witness share to already exist with correct permissions —
+  # see role file_server, and the note in the root README about the
+  # chicken-and-egg around the Cluster Name Object's permissions on that
+  # share (CNO doesn't exist in AD until the New-Cluster step above runs).
+  ansible.windows.win_shell: >
+    Set-ClusterQuorum -Cluster '{{ wsfc_cluster_name }}'
+    -FileShareWitness '{{ wsfc_witness_share_path }}'
+  when: wsfc_is_cluster_creation_node | bool
+  changed_when: true

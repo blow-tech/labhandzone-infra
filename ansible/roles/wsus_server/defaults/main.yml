@@ -1,0 +1,11 @@
+---
+wsus_content_dir: 'C:\WSUSContent'
+wsus_port: 8530
+wsus_products:
+  - "Windows Server 2022"
+  - "Windows Server 2019"
+wsus_classifications:
+  - "Critical Updates"
+  - "Security Updates"
+  - "Update Rollups"
+wsus_sync_hour: 2   # 2 AM local daily sync

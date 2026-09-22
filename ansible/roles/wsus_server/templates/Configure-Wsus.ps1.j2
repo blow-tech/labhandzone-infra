@@ -1,0 +1,38 @@
+# Managed by Ansible role wsus_server — templates/Configure-Wsus.ps1.j2
+# Idempotent: re-running this just re-applies the same subscription/schedule.
+
+$wsus = Get-WsusServer -Name localhost -PortNumber {{ wsus_port }}
+
+# --- Products ---
+$wsus.GetSubscription().GetUpdateCategories() | Out-Null   # forces a categories refresh if empty
+$allProducts = $wsus.GetUpdateCategories()
+$wantedProducts = @(
+{% for product in wsus_products %}
+  "{{ product }}"{{ "," if not loop.last }}
+{% endfor %}
+)
+$selectedProducts = $allProducts | Where-Object { $wantedProducts -contains $_.Title }
+$subscription = $wsus.GetSubscription()
+$subscription.SetUpdateCategories($selectedProducts)
+
+# --- Classifications ---
+$allClassifications = $wsus.GetUpdateClassifications()
+$wantedClassifications = @(
+{% for classification in wsus_classifications %}
+  "{{ classification }}"{{ "," if not loop.last }}
+{% endfor %}
+)
+$selectedClassifications = $allClassifications | Where-Object { $wantedClassifications -contains $_.Title }
+$subscription.SetUpdateClassifications($selectedClassifications)
+$subscription.Save()
+
+# --- Sync schedule: daily at the configured hour ---
+$subscription.SynchronizeAutomatically = $true
+$subscription.SynchronizeAutomaticallyTimeOfDay = New-TimeSpan -Hours {{ wsus_sync_hour }}
+$subscription.NumberOfSynchronizationsPerDay = 1
+$subscription.Save()
+
+# --- Kick an initial sync so content starts downloading now, not tonight ---
+$subscription.StartSynchronization()
+
+Write-Output "WSUS subscription configured: products=[$($wantedProducts -join ', ')] classifications=[$($wantedClassifications -join ', ')]"

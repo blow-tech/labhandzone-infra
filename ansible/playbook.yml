@@ -1,0 +1,53 @@
+---
+# playbook.yml
+# Builds out the labhandzone.local lab after Terraform has provisioned the
+# 5 VMs (see terraform/vsphere/). Play order encodes real dependencies —
+# do not run with --limit against a later phase before earlier phases have
+# completed at least once (e.g. sql_nodes can't join a domain that dc01
+# hasn't created yet).
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbook.yml --check --diff   # dry run
+#   ansible-playbook -i inventory/hosts.ini playbook.yml
+#   ansible-playbook -i inventory/hosts.ini playbook.yml --ask-vault-pass
+
+- name: "Phase 1: Promote dc01 to the first DC of a new forest"
+  hosts: domain_controller
+  roles:
+    - ad_domain_controller
+
+- name: "Phase 2: Join sql01, sql02, fs01, wsus01 to the domain"
+  hosts: fleet
+  roles:
+    - domain_join
+
+- name: "Phase 3: Stand up shared storage on fs01 (iSCSI target + witness/data shares)"
+  hosts: file_server
+  roles:
+    - iscsi_target
+    - file_server
+
+- name: "Phase 4: Connect sql01/sql02 to shared storage"
+  hosts: sql_nodes
+  roles:
+    - iscsi_initiator
+
+- name: "Phase 5: Build the Windows Failover Cluster"
+  hosts: sql_nodes
+  roles:
+    - windows_failover_cluster
+
+- name: "Phase 6: Install SQL Server as a Failover Cluster Instance"
+  hosts: sql_nodes
+  roles:
+    - sql_server_fci
+
+- name: "Phase 7: Stand up WSUS"
+  hosts: wsus
+  roles:
+    - wsus_server
+
+- name: "Phase 8: Create patch-ring OUs and GPOs, pointed at WSUS"
+  hosts: domain_controller
+  roles:
+    - gpo_patching

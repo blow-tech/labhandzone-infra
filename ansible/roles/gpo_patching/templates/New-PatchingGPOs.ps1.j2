@@ -1,0 +1,41 @@
+# Managed by Ansible role gpo_patching — templates/New-PatchingGPOs.ps1.j2
+# Runs on dc01 (needs the GroupPolicy PowerShell module, present on any DC).
+# Idempotent: New-GPO/Set-GPRegistryValue are safe to re-run.
+#
+# No dedicated Ansible module creates GPOs with registry-based settings
+# (microsoft.ad.gpo only manages links to an existing GPO) — this is the
+# one genuine gap where scripted PowerShell is the honest, standard
+# approach rather than a workaround.
+
+Import-Module GroupPolicy
+
+{% for ring in gpo_patching_rings %}
+# --- {{ ring.name }} ring ---
+$gpoName = "{{ ring.gpo_name }}"
+if (-not (Get-GPO -Name $gpoName -ErrorAction SilentlyContinue)) {
+    New-GPO -Name $gpoName | Out-Null
+    Write-Output "Created GPO: $gpoName"
+} else {
+    Write-Output "GPO already exists: $gpoName"
+}
+
+$wuKey = "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+$auKey = "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+
+Set-GPRegistryValue -Name $gpoName -Key $wuKey -ValueName "WUServer" -Type String -Value "{{ gpo_patching_wsus_url }}"
+Set-GPRegistryValue -Name $gpoName -Key $wuKey -ValueName "WUStatusServer" -Type String -Value "{{ gpo_patching_wsus_url }}"
+Set-GPRegistryValue -Name $gpoName -Key $wuKey -ValueName "TargetGroupEnabled" -Type DWord -Value 1
+Set-GPRegistryValue -Name $gpoName -Key $wuKey -ValueName "TargetGroup" -Type String -Value "{{ ring.name }}"
+
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "NoAutoUpdate" -Type DWord -Value 0
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "UseWUServer" -Type DWord -Value 1
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "AUOptions" -Type DWord -Value 4
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "ScheduledInstallDay" -Type DWord -Value {{ ring.auto_install_day }}
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "ScheduledInstallTime" -Type DWord -Value {{ ring.auto_install_time }}
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "DetectionFrequencyEnabled" -Type DWord -Value 1
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "DetectionFrequency" -Type DWord -Value {{ ring.detection_frequency_hours }}
+Set-GPRegistryValue -Name $gpoName -Key $auKey -ValueName "AutoInstallMinorUpdates" -Type DWord -Value 1
+
+Write-Output "Configured WSUS client settings for ring: {{ ring.name }} (deadline: {{ ring.deadline_days }} day(s) after approval — enforced via WSUS deadline, not GPO)"
+
+{% endfor %}

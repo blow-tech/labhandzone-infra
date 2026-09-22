@@ -1,0 +1,10 @@
+---
+iscsi_target_name: "labhandzone-cluster"
+iscsi_quorum_disk_size_gb: 4    # slightly under the 5GB raw disk to leave GPT/partition overhead room
+iscsi_data_disk_size_gb: 95     # slightly under the 100GB raw disk, same reason
+iscsi_quorum_drive_letter: "D"
+iscsi_data_drive_letter: "E"
+
+# IP-based initiator IDs — avoids needing to discover each SQL node's IQN
+# ahead of time. Set from group_vars/sql_nodes.yml or inventory hostvars.
+iscsi_allowed_initiator_ips: []

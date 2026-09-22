@@ -1,0 +1,9 @@
+---
+file_server_witness_share_name: "Witness"
+file_server_witness_share_path: 'C:\Shares\Witness'
+
+file_server_data_share_name: "CompanyData"
+file_server_data_share_path: 'C:\Shares\CompanyData'
+# Groups given Change access to the general-purpose share — set real AD
+# group names in group_vars/file_server.yml once they exist.
+file_server_data_share_access_groups: []

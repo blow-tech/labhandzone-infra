@@ -1,0 +1,22 @@
+---
+gpo_patching_domain_dn: "DC=labhandzone,DC=local"
+gpo_patching_wsus_url: "http://wsus01.labhandzone.local:8530"
+
+# Two-ring patching model: Pilot gets updates immediately for early
+# breakage detection; Broad gets them a scheduled number of days later —
+# the same "ring" concept most real patch-management processes use.
+gpo_patching_rings:
+  - name: "Pilot"
+    ou_name: "Pilot"
+    gpo_name: "Patching - Pilot Ring"
+    detection_frequency_hours: 6
+    auto_install_day: 0        # 0 = every day
+    auto_install_time: 3       # 3 AM
+    deadline_days: 1           # install within 1 day of approval — fast feedback loop
+  - name: "Broad"
+    ou_name: "Broad"
+    gpo_name: "Patching - Broad Ring"
+    detection_frequency_hours: 22
+    auto_install_day: 1        # 1 = Sunday
+    auto_install_time: 3
+    deadline_days: 7           # a week's buffer after Pilot proves updates are safe

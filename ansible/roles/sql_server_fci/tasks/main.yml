@@ -1,0 +1,60 @@
+---
+# tasks/main.yml — role: sql_server_fci
+# Runs on sql01 (sql_server_fci_action=InstallFailoverCluster) and sql02
+# (sql_server_fci_action=AddNode), set per-host in inventory/hosts.ini.
+#
+# HARD PREREQUISITE this role cannot satisfy: SQL Server installation
+# media must already be present at sql_server_media_path on the target —
+# licensed software, not something this repo can download or embed. Mount
+# an ISO or robocopy extracted setup files there before running this role.
+
+- name: Verify SQL Server setup media is present
+  ansible.windows.win_stat:
+    path: "{{ sql_server_media_path }}\\setup.exe"
+  register: setup_exe_check
+
+- name: Fail early with a clear message if media is missing
+  ansible.builtin.fail:
+    msg: >-
+      SQL Server setup.exe not found at {{ sql_server_media_path }}.
+      Mount the installation media (ISO or extracted files) there before
+      running this role — see the root README's SQL Server FCI section.
+  when: not setup_exe_check.stat.exists
+
+- name: Template ConfigurationFile.ini for InstallFailoverCluster (sql01)
+  ansible.windows.win_template:
+    src: ConfigurationFile-InstallFailoverCluster.ini.j2
+    dest: 'C:\Windows\Temp\ConfigurationFile.ini'
+  when: sql_server_fci_action == "InstallFailoverCluster"
+
+- name: Template ConfigurationFile.ini for AddNode (sql02)
+  ansible.windows.win_template:
+    src: ConfigurationFile-AddNode.ini.j2
+    dest: 'C:\Windows\Temp\ConfigurationFile.ini'
+  when: sql_server_fci_action == "AddNode"
+
+- name: Check whether this instance is already installed
+  ansible.windows.win_service_info:
+    name: "MSSQLSERVER"
+  register: sql_service_check
+
+- name: Run SQL Server setup (this takes several minutes — no live progress output)
+  ansible.windows.win_command: >
+    {{ sql_server_media_path }}\setup.exe
+    /ConfigurationFile=C:\Windows\Temp\ConfigurationFile.ini
+  register: sql_setup_result
+  when: sql_service_check.services | length == 0
+  # Setup logs its own detailed log under
+  # C:\Program Files\Microsoft SQL Server\<version>\Setup Bootstrap\Log\
+  # on the target — check there first if this task fails; the Ansible
+  # return code alone won't explain a setup.exe failure in useful detail.
+  failed_when: sql_setup_result.rc is defined and sql_setup_result.rc not in [0, 3010]
+
+- name: Reboot if setup requested it (rc 3010)
+  ansible.windows.win_reboot:
+  when: sql_setup_result is defined and sql_setup_result.rc is defined and sql_setup_result.rc == 3010
+
+- name: Clean up ConfigurationFile.ini (contains service account passwords)
+  ansible.windows.win_file:
+    path: 'C:\Windows\Temp\ConfigurationFile.ini'
+    state: absent

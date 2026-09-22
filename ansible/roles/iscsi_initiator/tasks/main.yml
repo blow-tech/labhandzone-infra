@@ -1,0 +1,97 @@
+---
+# tasks/main.yml — role: iscsi_initiator
+# Runs on sql01 and sql02. Connects to fs01's iSCSI target so the quorum
+# and data LUNs are visible as local disks — Windows Failover Clustering
+# (role: windows_failover_cluster) takes it from there.
+
+- name: Ensure Microsoft iSCSI Initiator service is running
+  ansible.windows.win_service:
+    name: MSiSCSI
+    start_mode: auto
+    state: started
+
+- name: Add iSCSI target portal (fs01)
+  ansible.windows.win_shell: |
+    if (-not (Get-IscsiTargetPortal -TargetPortalAddress '{{ iscsi_target_portal_ip }}' -ErrorAction SilentlyContinue)) {
+      New-IscsiTargetPortal -TargetPortalAddress '{{ iscsi_target_portal_ip }}'
+      Write-Output "added"
+    } else {
+      Write-Output "already present"
+    }
+  register: portal_result
+  changed_when: "'added' in portal_result.stdout"
+
+- name: Connect to the iSCSI target (persistent across reboots)
+  ansible.windows.win_shell: |
+    $target = Get-IscsiTarget | Where-Object { $_.NodeAddress -like '*{{ iscsi_target_name }}*' }
+    if ($target -and $target.IsConnected -eq $false) {
+      Connect-IscsiTarget -NodeAddress $target.NodeAddress -IsPersistent $true
+      Write-Output "connected"
+    } elseif ($target.IsConnected -eq $true) {
+      Write-Output "already connected"
+    } else {
+      Write-Error "Target matching '{{ iscsi_target_name }}' not found on portal {{ iscsi_target_portal_ip }} — check fs01's iscsi_target role ran first."
+    }
+  register: connect_result
+  changed_when: "'connected' in connect_result.stdout"
+
+- name: Rescan disks so the newly connected LUNs appear
+  ansible.windows.win_shell: Update-HostStorageCache
+  changed_when: true
+
+# --- Only on the first node (iscsi_initialize_disks: true) ---
+# IMPORTANT: these LUNs are blank/RAW from Windows' point of view even
+# though fs01 formatted its own local D:/E: volumes — that formatting was
+# only to give the .vhdx files somewhere to live on fs01, not to format
+# the virtual disks' own contents. So sql01 (the first node to connect)
+# genuinely does need to initialize + format them here.
+- name: Bring the new LUNs online and initialize as GPT (first node only)
+  ansible.windows.win_shell: |
+    Get-Disk | Where-Object { $_.OperationalStatus -eq 'Offline' -or $_.PartitionStyle -eq 'RAW' } | ForEach-Object {
+      Set-Disk -Number $_.Number -IsOffline $false
+      if ($_.PartitionStyle -eq 'RAW') {
+        Initialize-Disk -Number $_.Number -PartitionStyle GPT
+      }
+    }
+  register: online_result
+  changed_when: "online_result.stdout != ''"
+  when: iscsi_initialize_disks | bool
+
+- name: Identify the quorum LUN (smaller disk) and data LUN (larger disk) by size
+  ansible.windows.win_shell: |
+    $disks = Get-Disk | Where-Object { $_.BusType -eq 'iSCSI' } | Sort-Object Size
+    [PSCustomObject]@{
+      QuorumDiskNumber = $disks[0].Number
+      DataDiskNumber   = $disks[1].Number
+    } | ConvertTo-Json
+  register: iscsi_disk_ids
+  changed_when: false
+  when: iscsi_initialize_disks | bool
+
+- name: Create and format the quorum partition (drive Q:)
+  community.windows.win_partition:
+    disk_number: "{{ (iscsi_disk_ids.stdout | from_json).QuorumDiskNumber }}"
+    partition_size: -1
+    drive_letter: "Q"
+  when: iscsi_initialize_disks | bool
+
+- name: Format quorum partition NTFS
+  community.windows.win_format:
+    drive_letter: "Q"
+    file_system: NTFS
+    new_label: "Quorum"
+  when: iscsi_initialize_disks | bool
+
+- name: Create and format the SQL data partition (drive S:)
+  community.windows.win_partition:
+    disk_number: "{{ (iscsi_disk_ids.stdout | from_json).DataDiskNumber }}"
+    partition_size: -1
+    drive_letter: "S"
+  when: iscsi_initialize_disks | bool
+
+- name: Format SQL data partition NTFS
+  community.windows.win_format:
+    drive_letter: "S"
+    file_system: NTFS
+    new_label: "SQLData"
+  when: iscsi_initialize_disks | bool

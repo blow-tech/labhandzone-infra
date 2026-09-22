@@ -1,0 +1,17 @@
+---
+# Path to extracted SQL Server setup media — a hard prerequisite this role
+# cannot provide (licensed software). Mount/copy it here before running.
+sql_server_media_path: 'D:\SQLServerSetup'
+
+sql_server_fci_action: "InstallFailoverCluster"   # sql01: InstallFailoverCluster, sql02: AddNode
+sql_server_instance_name: "MSSQLSERVER"
+sql_server_fci_network_name: "SQLFCI01"   # the SQL Server's own virtual network name — distinct from the WSFC cluster name
+sql_server_fci_ip: ""                     # virtual IP clients connect to — set in group_vars/sql_nodes.yml
+sql_server_fci_ip_subnet_mask: "255.255.255.0"
+sql_server_data_drive: "S"                # matches the drive letter iscsi_initiator formats the SQL data LUN as
+
+sql_service_account: "LABHANDZONE\\svc_sqlengine"
+sql_service_account_password: "CHANGE_ME_VIA_ANSIBLE_VAULT"
+sql_agent_service_account: "LABHANDZONE\\svc_sqlagent"
+sql_agent_service_account_password: "CHANGE_ME_VIA_ANSIBLE_VAULT"
+sql_sysadmin_accounts: "LABHANDZONE\\Domain Admins"

@@ -1,0 +1,12 @@
+---
+# ansible/inventory/group_vars/file_server.yml
+domain_join_ou_path: "OU=FileServers,OU=Servers,DC=labhandzone,DC=local"
+
+# --- iscsi_target ---
+iscsi_allowed_initiator_ips:
+  - "10.10.10.21"   # sql01 — must match terraform.tfvars vm_ips.sql01
+  - "10.10.10.22"   # sql02 — must match terraform.tfvars vm_ips.sql02
+
+# --- file_server ---
+file_server_data_share_access_groups:
+  - "LABHANDZONE\\Domain Users"

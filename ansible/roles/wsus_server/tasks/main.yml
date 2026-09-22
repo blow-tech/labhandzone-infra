@@ -1,0 +1,53 @@
+---
+# tasks/main.yml — role: wsus_server
+# Runs on wsus01. Installs the WSUS role with a Windows Internal Database
+# (fine for a lab; a real deployment would point WSUS at a real SQL
+# instance instead), runs the required post-install step, then configures
+# product/classification subscriptions and sync schedule.
+
+- name: Install WSUS role (Windows Internal Database)
+  ansible.windows.win_feature:
+    name:
+      - UpdateServices
+      - UpdateServices-WidDB
+      - UpdateServices-Services
+      - UpdateServices-RSAT
+    include_management_tools: true
+    state: present
+  register: wsus_feature
+
+- name: Reboot if the feature install requires it
+  ansible.windows.win_reboot:
+  when: wsus_feature.reboot_required
+
+- name: Ensure content directory exists
+  ansible.windows.win_file:
+    path: "{{ wsus_content_dir }}"
+    state: directory
+
+- name: Check whether WSUS post-install has already run
+  ansible.windows.win_stat:
+    path: 'C:\Program Files\Update Services\LogFiles\SoftwareDistribution.log'
+  register: wsus_postinstall_check
+
+- name: Run WSUS post-install (wsusutil.exe postinstall)
+  ansible.windows.win_command: >
+    "C:\Program Files\Update Services\Tools\wsusutil.exe" postinstall
+    CONTENT_DIR="{{ wsus_content_dir }}"
+  when: not wsus_postinstall_check.stat.exists
+  register: wsus_postinstall_result
+
+- name: Template WSUS configuration script
+  ansible.windows.win_template:
+    src: Configure-Wsus.ps1.j2
+    dest: 'C:\Windows\Temp\Configure-Wsus.ps1'
+
+- name: Run WSUS configuration script (products, classifications, sync schedule)
+  ansible.windows.win_shell: 'C:\Windows\Temp\Configure-Wsus.ps1'
+  register: wsus_config_result
+  changed_when: true
+
+- name: Clean up configuration script
+  ansible.windows.win_file:
+    path: 'C:\Windows\Temp\Configure-Wsus.ps1'
+    state: absent

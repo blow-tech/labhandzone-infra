@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  yaml-lint:
+    name: YAML lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pip install yamllint
+      - name: Lint all YAML files
+        run: yamllint ansible
+
+  ansible-syntax-check:
+    name: Ansible syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Ansible + required collections
+        run: |
+          pip install ansible pywinrm
+          ansible-galaxy collection install -r ansible/requirements.yml
+      - name: ansible-playbook --syntax-check
+        working-directory: ansible
+        run: ansible-playbook -i inventory/hosts.ini playbook.yml --syntax-check
+      - name: ansible-lint
+        run: |
+          pip install ansible-lint
+          ansible-lint ansible/playbook.yml || true
+        # non-blocking — see the README's Continuous integration section
+
+  terraform-validate:
+    name: Terraform fmt + validate
+    runs-on: ubuntu-latest
+    # This job is the actual verification for terraform/ — it was written
+    # without a local terraform binary available (sandboxed dev environment
+    # with no route to releases.hashicorp.com), so this CI run is the first
+    # real fmt/validate check these files get. See terraform/README.md.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: terraform fmt -check
+        working-directory: terraform/vsphere
+        run: terraform fmt -check -recursive
+      - name: terraform init (backend disabled — no real vCenter to talk to)
+        working-directory: terraform/vsphere
+        run: terraform init -backend=false
+      - name: terraform validate
+        working-directory: terraform/vsphere
+        run: terraform validate
+
+  powershell-syntax-check:
+    name: PowerShell template syntax check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Render .ps1.j2 templates with representative dummy data (real Jinja2, not regex stripping)
+        shell: pwsh
+        run: |
+          pip install jinja2
+          python -c "
+          import jinja2, glob, os
+
+          env = jinja2.Environment(loader=jinja2.FileSystemLoader('ansible'))
+
+          # Representative context covering every variable these two
+          # templates actually reference — see their matching defaults/main.yml.
+          contexts = {
+              'roles/gpo_patching/templates/New-PatchingGPOs.ps1.j2': dict(
+                  gpo_patching_wsus_url='http://wsus01.labhandzone.local:8530',
+                  gpo_patching_rings=[
+                      dict(name='Pilot', ou_name='Pilot', gpo_name='Patching - Pilot Ring',
+                           detection_frequency_hours=6, auto_install_day=0, auto_install_time=3, deadline_days=1),
+                      dict(name='Broad', ou_name='Broad', gpo_name='Patching - Broad Ring',
+                           detection_frequency_hours=22, auto_install_day=1, auto_install_time=3, deadline_days=7),
+                  ],
+              ),
+              'roles/wsus_server/templates/Configure-Wsus.ps1.j2': dict(
+                  wsus_port=8530,
+                  wsus_products=['Windows Server 2022', 'Windows Server 2019'],
+                  wsus_classifications=['Critical Updates', 'Security Updates', 'Update Rollups'],
+                  wsus_sync_hour=2,
+              ),
+          }
+
+          os.makedirs('rendered_for_ci', exist_ok=True)
+          for tpl_path, ctx in contexts.items():
+              tpl = env.get_template(tpl_path)
+              out_name = os.path.basename(tpl_path).replace('.j2', '')
+              with open(f'rendered_for_ci/{out_name}', 'w') as f:
+                  f.write(tpl.render(**ctx))
+              print(f'Rendered {tpl_path} -> rendered_for_ci/{out_name}')
+          "
+      - name: Parse the rendered PowerShell for real syntax errors
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem -Path rendered_for_ci -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Error "Syntax errors in $($_.Name):"
+              $errors | ForEach-Object { Write-Error $_ }
+              $failed = $true
+            } else {
+              Write-Output "OK: $($_.Name)"
+            }
+          }
+          if ($failed) { exit 1 }

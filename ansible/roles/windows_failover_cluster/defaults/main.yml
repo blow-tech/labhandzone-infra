@@ -1,0 +1,8 @@
+---
+wsfc_cluster_name: "sqlcluster01"
+wsfc_cluster_ip: ""              # static IP for the cluster network name — set in group_vars/sql_nodes.yml
+wsfc_nodes: []                   # e.g. ["sql01", "sql02"] — set in group_vars/sql_nodes.yml
+wsfc_witness_share_path: ""      # e.g. \\fs01\Witness — set in group_vars/sql_nodes.yml
+# Only run cluster-creation commands from one node — the others just need
+# the Failover-Clustering feature installed.
+wsfc_is_cluster_creation_node: false
