@@ -1,7 +1,7 @@
 ---
 # playbook.yml
 # Builds out the labhandzone.local lab after Terraform has provisioned the
-# 5 VMs (see terraform/vsphere/). Play order encodes real dependencies —
+# 5 VMs (see terraform/vsphere/). Play order encodes real dependencies
 # do not run with --limit against a later phase before earlier phases have
 # completed at least once (e.g. sql_nodes can't join a domain that dc01
 # hasn't created yet).
