@@ -27,7 +27,7 @@ build the cluster, install SQL Server, or touch WSUS/GPOs that's all
 
 - **An existing Windows Server VM template** in vSphere (or a Content
   Library template) with VMware Tools installed. This project does not
-  build that template — create one manually via the vSphere client, or
+  build that template create one manually via the vSphere client, or
   with [Packer](https://developer.hashicorp.com/packer) if you want that
   step automated too (a natural next addition see the root README's
   Roadmap).
