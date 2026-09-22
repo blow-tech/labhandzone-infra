@@ -62,7 +62,7 @@ To port to Hyper-V or Azure:
 
 - **Hyper-V**: swap the module's internals for the
   [`hyperv` provider](https://registry.terraform.io/providers/taliesins/hyperv)
-  (community-maintained) — VHDX-based disks instead of vSphere `disk`
+  (community-maintained) VHDX-based disks instead of vSphere `disk`
   blocks, `hyperv_machine_instance` instead of `vsphere_virtual_machine`.
   Guest customization (static IP, computer name) isn't as built-in as
   vSphere's `customize` block you'd likely need an Autounattend.xml or a
@@ -82,7 +82,7 @@ changes.
 Being upfront: this was written without a live vCenter to `terraform
 apply` against, so it's validated for HCL syntax and structural
 correctness (`terraform fmt` + `terraform validate`, run in CI on every
-push — see the root README's Continuous Integration section) but not
+push see the root README's Continuous Integration section) but not
 proven end-to-end against real infrastructure. Review the customization
 block's Windows options against your actual template's OS version before
 a first real `apply`, and start with `terraform plan` to sanity-check the
