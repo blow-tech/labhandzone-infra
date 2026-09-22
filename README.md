@@ -9,7 +9,7 @@ Infrastructure-as-code for a full lab Active Directory environment:
 **Terraform** provisions 5 VMs on vSphere, **Ansible** then builds out a
 real AD forest (`labhandzone.local`), a 2-node SQL Server Failover Cluster
 Instance on iSCSI shared storage, a file server, a WSUS server, and a
-GPO-driven ring-based patching process — the same infrastructure shape a
+GPO-driven ring-based patching process the same infrastructure shape a
 lot of real mid-size environments still run today.
 
 Companion to [windows-fleet-monitoring](https://github.com/blow-tech/windows-fleet-monitoring)
@@ -110,12 +110,12 @@ labhandzone-infra/
 ## Prerequisites
 
 - A vSphere environment with an existing Windows Server template (VMware
-  Tools installed) — Terraform clones from it, it doesn't build it. See
+  Tools installed) Terraform clones from it, it doesn't build it. See
   [terraform/vsphere/README.md](terraform/vsphere/README.md).
 - Ansible control node: `ansible-core` 2.15+, `pywinrm`, and the
   `ansible.windows` / `community.windows` / `microsoft.ad` collections
   (`ansible/requirements.yml`)
-- **SQL Server installation media** — licensed software this repo cannot
+- **SQL Server installation media** licensed software this repo cannot
   provide. Mount it at `sql_server_media_path` on both SQL nodes before
   Phase 6.
 - Every VM needs `windows-fleet-monitoring`'s WinRM bootstrap applied (or
@@ -166,7 +166,7 @@ ansible-vault encrypt_string 'RealPassword123!' --name 'vault_local_admin_passwo
 That covers: the shared local Administrator password (set by Terraform's
 guest customization, reused by Ansible throughout — see the comment in
 `inventory/hosts.ini` on why), the AD Safe Mode password, and the SQL
-Server service account passwords. Never commit real values — everything
+Server service account passwords. Never commit real values everything
 sensitive in this repo is a placeholder by design.
 
 ## The patching process (what you actually asked for)
@@ -174,7 +174,7 @@ sensitive in this repo is a placeholder by design.
 `gpo_patching` implements a two-ring model, the same shape most real
 patch-management processes use:
 
-1. **Pilot ring** — a small set of machines (put your less-critical or
+1. **Pilot ring** a small set of machines (put your less-critical or
    canary servers' computer objects in `OU=Pilot,OU=PatchRings,...`)
    installs approved updates within 1 day, with WSUS detection checking in
    every 6 hours. This is where you find out an update breaks something,
@@ -183,10 +183,10 @@ patch-management processes use:
    installs the same updates a week later, once Pilot has proven them safe.
 
 Both rings get their own GPO with WSUS client-targeting registry values
-(`WUServer`, `TargetGroup`, `ScheduledInstallDay/Time`) — move a computer
+(`WUServer`, `TargetGroup`, `ScheduledInstallDay/Time`) move a computer
 object into the right OU, and Group Policy handles the rest on its next
 refresh. Approvals themselves still happen in the WSUS console (or via the
-WSUS PowerShell module) — GPOs control *when a machine checks for and
+WSUS PowerShell module) GPOs control *when a machine checks for and
 installs* approved updates, not *which updates get approved*; that
 separation is deliberate and matches how WSUS actually works.
 
@@ -197,19 +197,19 @@ Every push/PR runs via GitHub Actions (`.github/workflows/ci.yml`):
 - `ansible-playbook --syntax-check` + `ansible-lint` (non-blocking — same
   `var-naming[no-role-prefix]` style findings as the sibling repos, not
   hidden, just not yet fixed)
-- **`terraform fmt -check` + `terraform validate`** — this was written
+- **`terraform fmt -check` + `terraform validate`** this was written
   without a local `terraform` binary (sandboxed dev environment, no route
   to HashiCorp's release servers), so this CI job is the actual first
   verification these `.tf` files get
-- **PowerShell template syntax check** — the two `.ps1.j2` templates
+- **PowerShell template syntax check** the two `.ps1.j2` templates
   (`gpo_patching`, `wsus_server`) are rendered with real Jinja2 and
   representative dummy data, then parsed by the genuine PowerShell parser
   on a `windows-latest` runner. This replaced an earlier, weaker approach
   (regex-stripping Jinja tags) after testing showed it produced ambiguous,
-  falsely-failing PowerShell for the loop-based template — rendering with
+  falsely-failing PowerShell for the loop-based template endering with
   the real templating engine first is the correct fix, not a workaround.
 
-## Known limitations — read this before a real run
+## Known limitations read this before a real run
 
 Being direct about what has and hasn't actually been verified, same as
 the sibling repos:
@@ -220,7 +220,7 @@ the sibling repos:
   real bugs were caught and fixed this way during development (an invalid
   `vsphere_virtual_machine.tags` usage, a broken disk `unit_number`
   calculation, a wrong assumption in `iscsi_initiator` about disks
-  arriving pre-formatted, a YAML-breaking typo in `sql_server_fci`) — but
+  arriving pre-formatted, a YAML-breaking typo in `sql_server_fci`) but
   syntax-valid is not the same as "this cluster will actually form."
   Budget real troubleshooting time for the first live run, especially
   around WSFC quorum/networking and SQL FCI setup.
