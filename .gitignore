@@ -15,3 +15,5 @@ ansible/*.retry
 # OS/editor cruft
 .DS_Store
 *.swp
+
+/tests/storage-preflight.fixture.ps1

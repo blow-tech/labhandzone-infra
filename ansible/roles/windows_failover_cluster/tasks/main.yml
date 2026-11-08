@@ -5,6 +5,12 @@
 # run from the node flagged wsfc_is_cluster_creation_node: true (sql01, by
 # convention in this project — see group_vars/sql_nodes.yml).
 
+- name: Require reviewed cluster storage mapping
+  ansible.builtin.assert:
+    that:
+      - wsfc_expected_disk_resources | default([]) | length > 0
+    fail_msg: "Cluster disk import is a separate approved operation. Provide reviewed resource names."
+
 - name: Install Failover Clustering feature
   ansible.windows.win_feature:
     name: Failover-Clustering
@@ -20,6 +26,7 @@
 
 - name: Check whether the cluster already exists
   ansible.windows.win_shell: |
+    $ErrorActionPreference = 'Stop'
     if (Get-Cluster -Name '{{ wsfc_cluster_name }}' -ErrorAction SilentlyContinue) {
       Write-Output "exists"
     } else {
@@ -37,11 +44,20 @@
     - wsfc_is_cluster_creation_node | bool
     - cluster_check.stdout | trim == "absent"
 
-- name: Add available iSCSI disks (quorum + data) to the cluster
-  ansible.windows.win_shell: |
-    Get-ClusterAvailableDisk | Add-ClusterDisk
-  register: add_disk_result
-  changed_when: "add_disk_result.stdout != ''"
+- name: Validate reviewed cluster disk resource names instead of importing all available disks
+  ansible.windows.win_powershell:
+    error_action: stop
+    parameters:
+      ClusterName: "{{ wsfc_cluster_name }}"
+      ResourceNames: "{{ wsfc_expected_disk_resources }}"
+    script: |
+      [CmdletBinding(SupportsShouldProcess)]
+      param([string]$ClusterName,[string[]]$ResourceNames)
+      $Ansible.Changed = $false
+      foreach ($name in $ResourceNames) {
+        $r = @(Get-ClusterResource -Cluster $ClusterName -Name $name -ErrorAction Stop)
+        if ($r.Count -ne 1 -or $r[0].ResourceType -ne 'Physical Disk') { throw 'Reviewed disk resource missing; import only verified storage separately.' }
+      }
   when: wsfc_is_cluster_creation_node | bool
 
 - name: Configure quorum with a file share witness on fs01

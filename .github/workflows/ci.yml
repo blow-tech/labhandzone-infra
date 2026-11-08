@@ -35,8 +35,7 @@ jobs:
       - name: ansible-lint
         run: |
           pip install ansible-lint
-          ansible-lint ansible/playbook.yml || true
-        # non-blocking — see the README's Continuous integration section
+          ansible-lint --profile basic ansible/playbook.yml
 
   terraform-validate:
     name: Terraform fmt + validate
@@ -121,3 +120,17 @@ jobs:
             }
           }
           if ($failed) { exit 1 }
+
+  storage-preflight-fixtures:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: python tests/extract_preflight.py
+      - shell: powershell
+        run: ./tests/Validate-Storage.ps1
+      - shell: pwsh
+        run: ./tests/Validate-Storage.ps1

@@ -39,8 +39,19 @@
 
 - name: "Phase 6: Install SQL Server as a Failover Cluster Instance"
   hosts: sql_nodes
+  any_errors_fatal: true
+  serial: 1
   roles:
-    - sql_server_fci
+    - role: sql_server_fci
+      when: sql_server_fci_action == 'InstallFailoverCluster'
+
+- name: "Phase 6b: Add nodes only after first-node setup completes"
+  hosts: sql_nodes
+  any_errors_fatal: true
+  serial: 1
+  roles:
+    - role: sql_server_fci
+      when: sql_server_fci_action == 'AddNode'
 
 - name: "Phase 7: Stand up WSUS"
   hosts: wsus

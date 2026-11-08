@@ -21,40 +21,76 @@
       running this role — see the root README's SQL Server FCI section.
   when: not setup_exe_check.stat.exists
 
-- name: Template ConfigurationFile.ini for InstallFailoverCluster (sql01)
-  ansible.windows.win_template:
-    src: ConfigurationFile-InstallFailoverCluster.ini.j2
-    dest: 'C:\Windows\Temp\ConfigurationFile.ini'
-  when: sql_server_fci_action == "InstallFailoverCluster"
+- name: Require exact SQL lab validation and protected staging prerequisites
+  ansible.builtin.assert:
+    that:
+      - sql_fci_lab_validated | default(false) | bool
+      - sql_server_fci_action in ['InstallFailoverCluster', 'AddNode']
+      - sql_server_instance_name == 'MSSQLSERVER'
+      - sql_secret_staging_directory | default('') | length > 0
+      - sql_service_account_password != 'CHANGE_ME_VIA_ANSIBLE_VAULT'
+      - sql_agent_service_account_password != 'CHANGE_ME_VIA_ANSIBLE_VAULT'
+    fail_msg: "Validate exact setup-media parameters, disk/network resource names and restore in a disposable lab. Supply a protected secret staging directory and vault secrets."
+  no_log: true
 
-- name: Template ConfigurationFile.ini for AddNode (sql02)
-  ansible.windows.win_template:
-    src: ConfigurationFile-AddNode.ini.j2
-    dest: 'C:\Windows\Temp\ConfigurationFile.ini'
-  when: sql_server_fci_action == "AddNode"
+- name: Validate staging ACL before writing secrets
+  ansible.windows.win_powershell:
+    error_action: stop
+    parameters:
+      Path: "{{ sql_secret_staging_directory }}"
+    script: |
+      [CmdletBinding(SupportsShouldProcess)]
+      param([string]$Path)
+      $Ansible.Changed = $false
+      $dir = Get-Item -LiteralPath $Path -ErrorAction Stop
+      if (-not $dir.PSIsContainer -or ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Staging parent must be a real directory.' }
+      $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
+      $allowed = @('S-1-5-18','S-1-5-32-544',[Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+      if (-not $acl.AreAccessRulesProtected) { throw 'Staging directory must have reviewed protected ACLs.' }
+      foreach ($ace in $acl.Access) {
+        $sid = $ace.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
+        if ($ace.AccessControlType -eq 'Allow' -and $allowed -notcontains $sid) { throw 'Staging directory grants access to an unapproved principal.' }
+      }
 
 - name: Check whether this instance is already installed
   ansible.windows.win_service_info:
-    name: "MSSQLSERVER"
+    name: MSSQLSERVER
   register: sql_service_check
 
-- name: Run SQL Server setup (this takes several minutes — no live progress output)
-  ansible.windows.win_command: >
-    {{ sql_server_media_path }}\setup.exe
-    /ConfigurationFile=C:\Windows\Temp\ConfigurationFile.ini
-  register: sql_setup_result
+- name: Stage setup secrets only for installation and remove them on every result
   when: sql_service_check.services | length == 0
-  # Setup logs its own detailed log under
-  # C:\Program Files\Microsoft SQL Server\<version>\Setup Bootstrap\Log\
-  # on the target — check there first if this task fails; the Ansible
-  # return code alone won't explain a setup.exe failure in useful detail.
-  failed_when: sql_setup_result.rc is defined and sql_setup_result.rc not in [0, 3010]
+  block:
+    - name: Allocate unique configuration file
+      ansible.windows.win_tempfile:
+        path: "{{ sql_secret_staging_directory }}"
+        prefix: sql-fci-
+        suffix: .ini
+        state: file
+      register: sql_config_file
 
-- name: Reboot if setup requested it (rc 3010)
+    - name: Render the selected configuration without logging secrets or diffs
+      ansible.windows.win_template:
+        src: "ConfigurationFile-{{ sql_server_fci_action }}.ini.j2"
+        dest: "{{ sql_config_file.path }}"
+      no_log: true
+      diff: false
+
+    - name: Run SQL Server setup using the protected configuration
+      ansible.windows.win_command:
+        argv:
+          - "{{ sql_server_media_path }}\\setup.exe"
+          - "/ConfigurationFile={{ sql_config_file.path }}"
+      register: sql_setup_result
+      failed_when: sql_setup_result.rc not in [0, 3010]
+      no_log: true
+  always:
+    - name: Remove this run's password-bearing configuration
+      ansible.windows.win_file:
+        path: "{{ sql_config_file.path }}"
+        state: absent
+      when: sql_config_file.path is defined
+      no_log: true
+
+- name: Reboot if setup requested it
   ansible.windows.win_reboot:
-  when: sql_setup_result is defined and sql_setup_result.rc is defined and sql_setup_result.rc == 3010
-
-- name: Clean up ConfigurationFile.ini (contains service account passwords)
-  ansible.windows.win_file:
-    path: 'C:\Windows\Temp\ConfigurationFile.ini'
-    state: absent
+  when: sql_setup_result.rc | default(0) == 3010
