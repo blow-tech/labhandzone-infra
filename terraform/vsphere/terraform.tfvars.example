@@ -4,7 +4,7 @@
 vsphere_user                 = "administrator@vsphere.local"
 vsphere_password             = "CHANGE_ME"
 vsphere_server                = "vcenter.labhandzone.local"
-vsphere_allow_unverified_ssl = true
+vsphere_allow_unverified_ssl = false
 
 datacenter_name       = "Lab-Datacenter"
 compute_cluster_name  = "Lab-Cluster"

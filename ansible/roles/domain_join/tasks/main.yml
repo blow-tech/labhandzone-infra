@@ -5,6 +5,14 @@
 # each host's group_vars). Requires dc01's ad_domain_controller role to
 # have already run — the domain has to exist before anything can join it.
 
+- name: Reject unset deployment secrets
+  ansible.builtin.assert:
+    that:
+      - domain_join_admin_password | length > 0
+      - not (domain_join_admin_password is match('^CHANGE_ME'))
+    fail_msg: "Supply approved secrets through Ansible Vault before deployment."
+  no_log: true
+
 - name: Join the domain
   microsoft.ad.membership:
     dns_domain_name: "{{ domain_join_domain_name }}"
@@ -13,14 +21,14 @@
     domain_ou_path: "{{ domain_join_ou_path }}"
     state: domain
     reboot: true
-  register: join_result
+  register: domain_join_join_result
 
 - name: Wait for the host to come back after the domain-join reboot
   ansible.builtin.wait_for_connection:
     delay: 30
     timeout: 600
-  when: join_result.reboot_required | default(false)
+  when: domain_join_join_result.reboot_required | default(false)
 
 - name: Re-gather facts after the reboot
   ansible.builtin.setup:
-  when: join_result.reboot_required | default(false)
+  when: domain_join_join_result.reboot_required | default(false)

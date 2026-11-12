@@ -1,3 +1,5 @@
+> **Pending safety remediation:** read [REMEDIATION-2026-11.md](REMEDIATION-2026-11.md) before using deployment or collection examples. No production validation is implied.
+
 # labhandzone-infra
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
@@ -116,7 +118,7 @@ labhandzone-infra/
   `ansible.windows` / `community.windows` / `microsoft.ad` collections
   (`ansible/requirements.yml`)
 - **SQL Server installation media** licensed software this repo cannot
-  provide. Mount it at `sql_server_media_path` on both SQL nodes before
+  provide. Mount it at `sql_server_fci_sql_server_media_path` on both SQL nodes before
   Phase 6.
 - Every VM needs `windows-fleet-monitoring`'s WinRM bootstrap applied (or
   equivalent) before Ansible can reach it — Terraform's guest customization

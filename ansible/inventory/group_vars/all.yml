@@ -6,11 +6,11 @@
 
 vault_local_admin_password: "CHANGE_ME_VIA_ANSIBLE_VAULT"
 
-ad_domain_name: "labhandzone.local"
-ad_domain_netbios_name: "LABHANDZONE"
-ad_safe_mode_password: "CHANGE_ME_VIA_ANSIBLE_VAULT"
+ad_domain_controller_ad_domain_name: "labhandzone.local"
+ad_domain_controller_ad_domain_netbios_name: "LABHANDZONE"
+ad_domain_controller_ad_safe_mode_password: "CHANGE_ME_VIA_ANSIBLE_VAULT"
 
-domain_join_domain_name: "{{ ad_domain_name }}"
+domain_join_domain_name: "{{ ad_domain_controller_ad_domain_name }}"
 domain_join_admin_user: "LABHANDZONE\\Administrator"
 domain_join_admin_password: "{{ vault_local_admin_password }}"
 
