@@ -11,7 +11,7 @@ Mandatory lab gates: exact OS/collection/setup-media versions; LUN identity and 
 
 Validation: local YAML parsing and source contract checks only until CI/lab evidence is recorded. No WinRM, SQL, cluster or storage target contacted.
 
-Local validation: YAML parsing; VMware PowerCLI connection-scope/failure/WWPN/JSON fixtures passed in PowerShell 7.4.13 for the migration repository. Windows versions and Ansible contracts are checked by the PR CI; infrastructure integration remains unverified.
+Local validation and PR CI use syntax/static checks only, plus mocked storage preflight where applicable; infrastructure integration remains unverified.
 
 ## Variable migration (breaking)
 
@@ -69,3 +69,5 @@ Role variables and registered results now use role prefixes; update external inv
 | `wsus_sync_hour` | `wsus_server_wsus_sync_hour` |
 
 Validation update: local yamllint, Ansible syntax check and ansible-lint basic profile pass after migrating role-variable names. CI no longer suppresses lint failures. Lab storage preflight fixtures reject unrelated RAW/system/boot disks and invalid manifests; Windows PowerShell array handling was corrected from CI evidence. No infrastructure play was executed.
+
+WinRM certificate validation now defaults to validate and the vSphere tfvars example disables unverified SSL. Provision trusted certificates before applying. Domain/DSRM secret preflights reject unchanged placeholders; supply protected Vault values under the migrated names.
