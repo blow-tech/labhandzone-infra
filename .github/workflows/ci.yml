@@ -89,10 +89,10 @@ jobs:
                   ],
               ),
               'roles/wsus_server/templates/Configure-Wsus.ps1.j2': dict(
-                  wsus_port=8530,
-                  wsus_products=['Windows Server 2022', 'Windows Server 2019'],
-                  wsus_classifications=['Critical Updates', 'Security Updates', 'Update Rollups'],
-                  wsus_sync_hour=2,
+                  wsus_server_wsus_port=8530,
+                  wsus_server_wsus_products=['Windows Server 2022', 'Windows Server 2019'],
+                  wsus_server_wsus_classifications=['Critical Updates', 'Security Updates', 'Update Rollups'],
+                  wsus_server_wsus_sync_hour=2,
               ),
           }
 

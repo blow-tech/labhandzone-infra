@@ -14,28 +14,28 @@
       - UpdateServices-RSAT
     include_management_tools: true
     state: present
-  register: wsus_feature
+  register: wsus_server_wsus_feature
 
 - name: Reboot if the feature install requires it
   ansible.windows.win_reboot:
-  when: wsus_feature.reboot_required
+  when: wsus_server_wsus_feature.reboot_required
 
 - name: Ensure content directory exists
   ansible.windows.win_file:
-    path: "{{ wsus_content_dir }}"
+    path: "{{ wsus_server_wsus_content_dir }}"
     state: directory
 
 - name: Check whether WSUS post-install has already run
   ansible.windows.win_stat:
     path: 'C:\Program Files\Update Services\LogFiles\SoftwareDistribution.log'
-  register: wsus_postinstall_check
+  register: wsus_server_wsus_postinstall_check
 
 - name: Run WSUS post-install (wsusutil.exe postinstall)
   ansible.windows.win_command: >
     "C:\Program Files\Update Services\Tools\wsusutil.exe" postinstall
-    CONTENT_DIR="{{ wsus_content_dir }}"
-  when: not wsus_postinstall_check.stat.exists
-  register: wsus_postinstall_result
+    CONTENT_DIR="{{ wsus_server_wsus_content_dir }}"
+  when: not wsus_server_wsus_postinstall_check.stat.exists
+  register: wsus_server_wsus_postinstall_result
 
 - name: Template WSUS configuration script
   ansible.windows.win_template:
@@ -44,7 +44,7 @@
 
 - name: Run WSUS configuration script (products, classifications, sync schedule)
   ansible.windows.win_shell: 'C:\Windows\Temp\Configure-Wsus.ps1'
-  register: wsus_config_result
+  register: wsus_server_wsus_config_result
   changed_when: true
 
 - name: Clean up configuration script

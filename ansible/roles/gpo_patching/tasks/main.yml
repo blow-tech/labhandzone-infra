@@ -26,7 +26,7 @@
 
 - name: Run the GPO creation/configuration script
   ansible.windows.win_shell: 'C:\Windows\Temp\New-PatchingGPOs.ps1'
-  register: gpo_script_result
+  register: gpo_patching_gpo_script_result
   changed_when: true
 
 - name: Clean up the script

@@ -8,7 +8,7 @@
   ansible.builtin.assert:
     that:
       - iscsi_target_iqn | default('') is match('^iqn\.')
-      - iscsi_target_portal_ip | length > 0
+      - iscsi_initiator_iscsi_target_portal_ip | length > 0
       - iscsi_lun_manifest | default([]) | length == 2
     fail_msg: "Supply exact target IQN, portal and two immutable LUN mappings; pre-provision storage separately."
 
@@ -21,21 +21,21 @@
 - name: Add iSCSI target portal (fs01)
   ansible.windows.win_shell: |
     $ErrorActionPreference = 'Stop'
-    if (-not (Get-IscsiTargetPortal -TargetPortalAddress '{{ iscsi_target_portal_ip }}' -ErrorAction SilentlyContinue)) {
-      New-IscsiTargetPortal -TargetPortalAddress '{{ iscsi_target_portal_ip }}'
+    if (-not (Get-IscsiTargetPortal -TargetPortalAddress '{{ iscsi_initiator_iscsi_target_portal_ip }}' -ErrorAction SilentlyContinue)) {
+      New-IscsiTargetPortal -TargetPortalAddress '{{ iscsi_initiator_iscsi_target_portal_ip }}'
       Write-Output "added"
     } else {
       Write-Output "already present"
     }
-  register: portal_result
-  changed_when: "'added' in portal_result.stdout"
+  register: iscsi_initiator_portal_result
+  changed_when: "'added' in iscsi_initiator_portal_result.stdout"
 
 - name: Connect only the approved exact iSCSI target IQN
   ansible.windows.win_powershell:
     error_action: stop
     parameters:
       TargetIqn: "{{ iscsi_target_iqn }}"
-      Portal: "{{ iscsi_target_portal_ip }}"
+      Portal: "{{ iscsi_initiator_iscsi_target_portal_ip }}"
     script: |
       [CmdletBinding(SupportsShouldProcess)]
       param([string]$TargetIqn,[string]$Portal)
@@ -61,7 +61,8 @@
       [CmdletBinding(SupportsShouldProcess)]
       param([string]$ManifestJson)
       $Ansible.Changed = $false
-      $entries = @(ConvertFrom-Json $ManifestJson)
+      $entries = ConvertFrom-Json -InputObject $ManifestJson
+      $entries = @($entries)
       if ($entries.Count -ne 2) { throw 'Exactly two reviewed LUN mappings are required.' }
       $ids = @{}
       foreach ($e in $entries) {
@@ -70,4 +71,4 @@
         $disks = @(Get-Disk -ErrorAction Stop | Where-Object { $_.UniqueId -ceq $e.UniqueId })
         if ($disks.Count -ne 1 -or $disks[0].BusType -ne 'iSCSI' -or $disks[0].IsBoot -or $disks[0].IsSystem -or $disks[0].PartitionStyle -eq 'RAW' -or $disks[0].Size -ne [long]$e.SizeBytes) { throw 'Unexpected or unprovisioned LUN.' }
       }
-  when: iscsi_initialize_disks | bool
+  when: iscsi_initiator_iscsi_initialize_disks | bool

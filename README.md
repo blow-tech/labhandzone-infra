@@ -118,7 +118,7 @@ labhandzone-infra/
   `ansible.windows` / `community.windows` / `microsoft.ad` collections
   (`ansible/requirements.yml`)
 - **SQL Server installation media** licensed software this repo cannot
-  provide. Mount it at `sql_server_media_path` on both SQL nodes before
+  provide. Mount it at `sql_server_fci_sql_server_media_path` on both SQL nodes before
   Phase 6.
 - Every VM needs `windows-fleet-monitoring`'s WinRM bootstrap applied (or
   equivalent) before Ansible can reach it — Terraform's guest customization

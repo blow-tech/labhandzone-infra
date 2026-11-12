@@ -4,32 +4,32 @@
 # (sql_server_fci_action=AddNode), set per-host in inventory/hosts.ini.
 #
 # HARD PREREQUISITE this role cannot satisfy: SQL Server installation
-# media must already be present at sql_server_media_path on the target —
+# media must already be present at sql_server_fci_sql_server_media_path on the target —
 # licensed software, not something this repo can download or embed. Mount
 # an ISO or robocopy extracted setup files there before running this role.
 
 - name: Verify SQL Server setup media is present
   ansible.windows.win_stat:
-    path: "{{ sql_server_media_path }}\\setup.exe"
-  register: setup_exe_check
+    path: "{{ sql_server_fci_sql_server_media_path }}\\setup.exe"
+  register: sql_server_fci_setup_exe_check
 
 - name: Fail early with a clear message if media is missing
   ansible.builtin.fail:
     msg: >-
-      SQL Server setup.exe not found at {{ sql_server_media_path }}.
+      SQL Server setup.exe not found at {{ sql_server_fci_sql_server_media_path }}.
       Mount the installation media (ISO or extracted files) there before
       running this role — see the root README's SQL Server FCI section.
-  when: not setup_exe_check.stat.exists
+  when: not sql_server_fci_setup_exe_check.stat.exists
 
 - name: Require exact SQL lab validation and protected staging prerequisites
   ansible.builtin.assert:
     that:
       - sql_fci_lab_validated | default(false) | bool
       - sql_server_fci_action in ['InstallFailoverCluster', 'AddNode']
-      - sql_server_instance_name == 'MSSQLSERVER'
+      - sql_server_fci_sql_server_instance_name == 'MSSQLSERVER'
       - sql_secret_staging_directory | default('') | length > 0
-      - sql_service_account_password != 'CHANGE_ME_VIA_ANSIBLE_VAULT'
-      - sql_agent_service_account_password != 'CHANGE_ME_VIA_ANSIBLE_VAULT'
+      - sql_server_fci_sql_service_account_password != 'CHANGE_ME_VIA_ANSIBLE_VAULT'
+      - sql_server_fci_sql_agent_service_account_password != 'CHANGE_ME_VIA_ANSIBLE_VAULT'
     fail_msg: "Validate exact setup-media parameters, disk/network resource names and restore in a disposable lab. Supply a protected secret staging directory and vault secrets."
   no_log: true
 
@@ -55,10 +55,10 @@
 - name: Check whether this instance is already installed
   ansible.windows.win_service_info:
     name: MSSQLSERVER
-  register: sql_service_check
+  register: sql_server_fci_sql_service_check
 
 - name: Stage setup secrets only for installation and remove them on every result
-  when: sql_service_check.services | length == 0
+  when: sql_server_fci_sql_service_check.services | length == 0
   block:
     - name: Allocate unique configuration file
       ansible.windows.win_tempfile:
@@ -66,31 +66,31 @@
         prefix: sql-fci-
         suffix: .ini
         state: file
-      register: sql_config_file
+      register: sql_server_fci_sql_config_file
 
     - name: Render the selected configuration without logging secrets or diffs
       ansible.windows.win_template:
         src: "ConfigurationFile-{{ sql_server_fci_action }}.ini.j2"
-        dest: "{{ sql_config_file.path }}"
+        dest: "{{ sql_server_fci_sql_config_file.path }}"
       no_log: true
       diff: false
 
     - name: Run SQL Server setup using the protected configuration
       ansible.windows.win_command:
         argv:
-          - "{{ sql_server_media_path }}\\setup.exe"
-          - "/ConfigurationFile={{ sql_config_file.path }}"
-      register: sql_setup_result
-      failed_when: sql_setup_result.rc not in [0, 3010]
+          - "{{ sql_server_fci_sql_server_media_path }}\\setup.exe"
+          - "/ConfigurationFile={{ sql_server_fci_sql_config_file.path }}"
+      register: sql_server_fci_sql_setup_result
+      failed_when: sql_server_fci_sql_setup_result.rc not in [0, 3010]
       no_log: true
   always:
     - name: Remove this run's password-bearing configuration
       ansible.windows.win_file:
-        path: "{{ sql_config_file.path }}"
+        path: "{{ sql_server_fci_sql_config_file.path }}"
         state: absent
-      when: sql_config_file.path is defined
+      when: sql_server_fci_sql_config_file.path is defined
       no_log: true
 
 - name: Reboot if setup requested it
   ansible.windows.win_reboot:
-  when: sql_setup_result.rc | default(0) == 3010
+  when: sql_server_fci_sql_setup_result.rc | default(0) == 3010

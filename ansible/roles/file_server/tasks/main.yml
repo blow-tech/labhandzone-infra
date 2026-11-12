@@ -30,7 +30,7 @@
   # Computers, so this avoids the ordering problem without granting
   # Everyone/Authenticated Users. For a hardened, non-lab setup: run a
   # follow-up task after cluster creation that replaces this grant with an
-  # explicit ACE for "{{ wsfc_cluster_name }}$" specifically.
+  # explicit ACE for "{{ windows_failover_cluster_wsfc_cluster_name }}$" specifically.
   ansible.windows.win_acl:
     path: "{{ file_server_witness_share_path }}"
     user: "LABHANDZONE\\Domain Computers"
